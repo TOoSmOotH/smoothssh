@@ -16,20 +16,19 @@ import (
 type ViewMode string
 
 const (
-	ViewMain       ViewMode = "main"
-	ViewFile       ViewMode = "filebrowser"
-	ViewProcess    ViewMode = "processviewer"
-	ViewLog        ViewMode = "logviewer"
-	ViewService    ViewMode = "servicemanager"
+	ViewMain   ViewMode = "main"
+	ViewFile   ViewMode = "filebrowser"
+	ViewProcess ViewMode = "processviewer"
 )
 
 type Model struct {
-	config      *config.Config
-	quitting    bool
-	session     *ai.Session
-	client      *ssh.Client
+	config    *config.Config
+	quitting  bool
+	session   *ai.Session
+	client    *ssh.Client
 	currentView ViewMode
 	fileBrowser *components.FileBrowser
+	processViewer *components.ProcessViewer
 }
 
 func New(config *config.Config) *Model {
@@ -42,6 +41,9 @@ func New(config *config.Config) *Model {
 func (m *Model) Init() tea.Cmd {
 	if m.fileBrowser == nil {
 		m.fileBrowser = components.NewFileBrowser()
+	}
+	if m.processViewer == nil {
+		m.processViewer = components.NewProcessViewer()
 	}
 	return nil
 }
@@ -61,25 +63,26 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "p":
 			m.currentView = ViewProcess
 			return m, nil
-		case "l":
-			m.currentView = ViewLog
-			return m, nil
-		case "s":
-			m.currentView = ViewService
-			return m, nil
 		case "m":
 			m.currentView = ViewMain
 			return m, nil
 		}
 	}
 
+	var cmd tea.Cmd
 	if m.fileBrowser != nil && m.currentView == ViewFile {
 		model, cmd := m.fileBrowser.Update(msg)
 		m.fileBrowser = model.(*components.FileBrowser)
 		return m, cmd
 	}
+	
+	if m.processViewer != nil && m.currentView == ViewProcess {
+		model, cmd := m.processViewer.Update(msg)
+		m.processViewer = model.(*components.ProcessViewer)
+		return m, cmd
+	}
 
-	return m, nil
+	return m, cmd
 }
 
 func (m *Model) initSession() (tea.Model, tea.Cmd) {
@@ -153,8 +156,6 @@ func (m *Model) View() string {
 		mainContent.WriteString("\nSystem Admin Views:\n")
 		mainContent.WriteString("  f - File Browser\n")
 		mainContent.WriteString("  p - Process Viewer\n")
-		mainContent.WriteString("  l - Log Viewer\n")
-		mainContent.WriteString("  s - Service Manager\n")
 	}
 
 	switch m.currentView {
@@ -162,10 +163,6 @@ func (m *Model) View() string {
 		return m.getFileBrowserView()
 	case ViewProcess:
 		return m.getProcessViewerView()
-	case ViewLog:
-		return m.getLogViewerView()
-	case ViewService:
-		return m.getServiceManagerView()
 	default:
 		return mainContent.String()
 	}
@@ -179,30 +176,10 @@ func (m *Model) getFileBrowserView() string {
 }
 
 func (m *Model) getProcessViewerView() string {
-	return lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("63")).
-		Render("Process Viewer") + "\n\n" +
-		"Live process listing coming soon...\n\n" +
-		"Press m to return to main view\n"
-}
-
-func (m *Model) getLogViewerView() string {
-	return lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("63")).
-		Render("Log Viewer") + "\n\n" +
-		"Tail and filter logs coming soon...\n\n" +
-		"Press m to return to main view\n"
-}
-
-func (m *Model) getServiceManagerView() string {
-	return lipgloss.NewStyle().
-		Bold(true).
-		Foreground(lipgloss.Color("63")).
-		Render("Service Manager") + "\n\n" +
-		"Systemd service management coming soon...\n\n" +
-		"Press m to return to main view\n"
+	if m.processViewer != nil {
+		return m.processViewer.View()
+	}
+	return "Process Viewer not initialized"
 }
 
 func Run(cfg *config.Config) error {
