@@ -10,20 +10,39 @@ import (
 	"github.com/mreeves/smoothssh/config"
 	"github.com/mreeves/smoothssh/model"
 	"github.com/mreeves/smoothssh/ssh"
+	"github.com/mreeves/smoothssh/tui/components"
+)
+
+type ViewMode string
+
+const (
+	ViewMain       ViewMode = "main"
+	ViewFile       ViewMode = "filebrowser"
+	ViewProcess    ViewMode = "processviewer"
+	ViewLog        ViewMode = "logviewer"
+	ViewService    ViewMode = "servicemanager"
 )
 
 type Model struct {
-	config   *config.Config
-	quitting bool
-	session  *ai.Session
-	client   *ssh.Client
+	config      *config.Config
+	quitting    bool
+	session     *ai.Session
+	client      *ssh.Client
+	currentView ViewMode
+	fileBrowser *components.FileBrowser
 }
 
 func New(config *config.Config) *Model {
-	return &Model{config: config}
+	return &Model{
+		config:      config,
+		currentView: ViewMain,
+	}
 }
 
 func (m *Model) Init() tea.Cmd {
+	if m.fileBrowser == nil {
+		m.fileBrowser = components.NewFileBrowser()
+	}
 	return nil
 }
 
@@ -36,8 +55,30 @@ func (m *Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 			return m, tea.Quit
 		case "ctrl+r":
 			return m.initSession()
+		case "f":
+			m.currentView = ViewFile
+			return m, nil
+		case "p":
+			m.currentView = ViewProcess
+			return m, nil
+		case "l":
+			m.currentView = ViewLog
+			return m, nil
+		case "s":
+			m.currentView = ViewService
+			return m, nil
+		case "m":
+			m.currentView = ViewMain
+			return m, nil
 		}
 	}
+
+	if m.fileBrowser != nil && m.currentView == ViewFile {
+		model, cmd := m.fileBrowser.Update(msg)
+		m.fileBrowser = model.(*components.FileBrowser)
+		return m, cmd
+	}
+
 	return m, nil
 }
 
@@ -92,23 +133,76 @@ func (m *Model) View() string {
 		Foreground(lipgloss.Color("240")).
 		Render(fmt.Sprintf("Profile: %s | AI: %s", m.config.Profiles[0].Name, m.config.AI.Provider))
 
-	content := strings.Builder{}
-	content.WriteString(header + "\n")
-	content.WriteString(subheader + "\n")
-	content.WriteString(strings.Repeat("=", 40) + "\n\n")
+	mainContent := strings.Builder{}
+	mainContent.WriteString(header + "\n")
+	mainContent.WriteString(subheader + "\n")
+	mainContent.WriteString(strings.Repeat("=", 40) + "\n\n")
 
 	if m.session == nil {
-		content.WriteString("Press Ctrl+R to connect and initialize AI session\n")
+		mainContent.WriteString("Press Ctrl+R to connect and initialize AI session\n")
 	} else {
-		content.WriteString("✓ Session connected - AI assistant ready\n")
+		mainContent.WriteString("Session connected - AI assistant ready\n")
 	}
 
-	content.WriteString("\n")
-	content.WriteString("Key Bindings:\n")
-	content.WriteString("  q, esc, Ctrl+C - Quit\n")
-	content.WriteString("  Ctrl+R         - Reset/Reconnect\n")
+	mainContent.WriteString("\n")
+	mainContent.WriteString("Key Bindings:\n")
+	mainContent.WriteString("  q, esc, Ctrl+C - Quit\n")
+	mainContent.WriteString("  Ctrl+R         - Reset/Reconnect\n")
 
-	return content.String()
+	if m.session != nil {
+		mainContent.WriteString("\nSystem Admin Views:\n")
+		mainContent.WriteString("  f - File Browser\n")
+		mainContent.WriteString("  p - Process Viewer\n")
+		mainContent.WriteString("  l - Log Viewer\n")
+		mainContent.WriteString("  s - Service Manager\n")
+	}
+
+	switch m.currentView {
+	case ViewFile:
+		return m.getFileBrowserView()
+	case ViewProcess:
+		return m.getProcessViewerView()
+	case ViewLog:
+		return m.getLogViewerView()
+	case ViewService:
+		return m.getServiceManagerView()
+	default:
+		return mainContent.String()
+	}
+}
+
+func (m *Model) getFileBrowserView() string {
+	if m.fileBrowser != nil {
+		return m.fileBrowser.View()
+	}
+	return "File Browser not initialized"
+}
+
+func (m *Model) getProcessViewerView() string {
+	return lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("63")).
+		Render("Process Viewer") + "\n\n" +
+		"Live process listing coming soon...\n\n" +
+		"Press m to return to main view\n"
+}
+
+func (m *Model) getLogViewerView() string {
+	return lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("63")).
+		Render("Log Viewer") + "\n\n" +
+		"Tail and filter logs coming soon...\n\n" +
+		"Press m to return to main view\n"
+}
+
+func (m *Model) getServiceManagerView() string {
+	return lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color("63")).
+		Render("Service Manager") + "\n\n" +
+		"Systemd service management coming soon...\n\n" +
+		"Press m to return to main view\n"
 }
 
 func Run(cfg *config.Config) error {
