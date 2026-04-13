@@ -1,9 +1,15 @@
 #!/bin/bash
 
-echo "Setting up SmoothSSH config..."
+# SmoothSSH Setup Script
+# Copies config to user's config directory
 
-mkdir -p ~/.config/smoothssh
-cp /home/mreeves/Projects/Personal/smoothssh/config.yaml ~/.config/smoothssh/config.yaml
+set -e
 
-echo "Config copied to ~/.config/smoothssh/config.yaml"
-echo "Please edit the file to add your SSH servers and AI settings."
+CONFIG_DIR="$HOME/.config/smoothssh"
+mkdir -p "$CONFIG_DIR"
+
+cp "config.yaml" "$CONFIG_DIR/config.yaml"
+
+echo "Config copied to $CONFIG_DIR/config.yaml"
+echo ""
+echo "Please edit the file to configure your servers and AI settings."
