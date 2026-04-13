@@ -1,0 +1,62 @@
+profiles:
+  - name: production-servers
+    type: ssh
+    hosts:
+      - web01.prod.example.com
+      - web02.prod.example.com
+      - db01.prod.example.com
+    user: admin
+    port: 22
+    key_file: ~/.ssh/id_ed25519
+    forward_agent: true
+    
+  - name: development-local
+    type: ssh
+    hosts:
+      - localhost:2222
+    user: devuser
+    port: 2222
+
+ai:
+  provider: local
+  endpoint: http://localhost:11434
+  model: qwen3:30b
+  max_tokens: 4096
+  
+  api_keys:
+    openai: $OPENAI_API_KEY
+    anthropic: $ANTHROPIC_API_KEY
+    groq: $GROQ_API_KEY
+    
+tools:
+  permissions:
+    auto_approve:
+      - view
+      - ls
+      - grep
+      - view_file
+      
+    manual_approve:
+      - bash
+      - write
+      - edit
+      - run_service
+
+sysadmin:
+  resources:
+    cpu_warning: 80
+    cpu_critical: 95
+    memory_warning: 85
+    memory_critical: 95
+    
+  logs:
+    default_sources:
+      - /var/log/syslog
+      - /var/log/auth.log
+      - /var/log/daemon.log
+      
+  services:
+    supported_managers:
+      - systemd
+      - openbsdrc
+      - s6
